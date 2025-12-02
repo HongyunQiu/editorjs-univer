@@ -82,4 +82,9 @@
   font-size: 12px;
 }
 
+/* 只读模式下可选的视觉弱提示（实际禁止编辑由 Univer 权限系统完成） */
+.cdx-univer-sheet__inline-container[data-readonly='true'] {
+  background-color: #f3f4f6;
+}
+
 

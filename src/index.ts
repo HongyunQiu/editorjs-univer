@@ -4,10 +4,13 @@ import { IconQuote } from '@codexteam/icons';
 import { make } from '@editorjs/dom';
 import type { API, BlockAPI, BlockTool, ToolConfig, SanitizerConfig } from '@editorjs/editorjs';
 import {
+  IPermissionService,
   LocaleType,
   Univer,
   UniverInstanceType,
 } from '@univerjs/core';
+import { FUniver } from '@univerjs/core/facade';
+import '@univerjs/sheets/facade';
 import DesignEnUS from '@univerjs/design/locale/en-US';
 import { defaultTheme } from '@univerjs/design';
 import { UniverDocsPlugin } from '@univerjs/docs';
@@ -15,7 +18,7 @@ import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
 import DocsUIEnUS from '@univerjs/docs-ui/locale/en-US';
 import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
 import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
-import { UniverSheetsPlugin } from '@univerjs/sheets';
+import { UniverSheetsPlugin, WorkbookEditablePermission } from '@univerjs/sheets';
 import SheetsEnUS from '@univerjs/sheets/locale/en-US';
 import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula';
 import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui';
@@ -41,6 +44,20 @@ export interface UniverSheetConfig extends ToolConfig {
    */
   title?: string;
   openButtonText?: string;
+
+  /**
+   * 当工作簿“真实数据”发生变更时触发的回调。
+   *
+   * 判定原则：
+   * - 基于 Univer 的命令系统（Mutation 类型命令）和部分事件（如 SheetValueChanged）
+   * - 只在可能导致单元格数据 / 工作簿结构变更的操作后触发
+   * - 不会因为纯 UI 行为（如选区移动、鼠标悬停、滚动等）触发
+   *
+   * 该回调由宿主应用自行决定如何使用：
+   * - 例如在笔记应用中调用 markDirty()
+   * - 或在其它集成中触发自动保存、同步等逻辑
+   */
+  onDataChange?: (payload?: { snapshot?: unknown }) => void;
 }
 
 export interface UniverSheetData {
@@ -74,6 +91,13 @@ interface UniverSheetCSS {
 interface UniverRuntime {
   dispose: () => void;
   exportData: () => Promise<unknown> | unknown;
+  /**
+   * 根据 readOnly 切换内部 univer 工作簿的编辑权限。
+   *
+   * - readOnly = true  -> 整个 Workbook 只读（不可编辑）
+   * - readOnly = false -> 允许编辑
+   */
+  setReadOnly?: (readOnly: boolean) => Promise<void> | void;
 }
 
 /**
@@ -123,6 +147,15 @@ export default class UniverSheetTool implements BlockTool {
       wrapper: 'cdx-univer-sheet',
       canvasWrapper: 'cdx-univer-sheet__canvas-wrapper',
     };
+
+    // 将实例注册到全局集合，便于宿主应用（如 QNotes）在切换 Editor.js 只读状态时同步到所有 Univer 表格块
+    if (typeof window !== 'undefined') {
+      const w = window as unknown as { __QNotesUniverSheets?: Set<UniverSheetTool> };
+      if (!w.__QNotesUniverSheets) {
+        w.__QNotesUniverSheets = new Set<UniverSheetTool>();
+      }
+      w.__QNotesUniverSheets.add(this);
+    }
   }
 
   public static get isReadOnlySupported(): boolean {
@@ -142,6 +175,23 @@ export default class UniverSheetTool implements BlockTool {
 
   public static get enableLineBreaks(): boolean {
     return true;
+  }
+
+  /**
+   * 供宿主应用在运行时切换只读状态（例如 QNotes 中的“开始编辑 / 只读查看”）时调用。
+   */
+  public async applyReadOnly(readOnly: boolean): Promise<void> {
+    this.readOnly = readOnly;
+
+    // 已经挂载了嵌入式实例时，尝试同步工作簿权限
+    if (this.inlineRuntime && typeof this.inlineRuntime.setReadOnly === 'function') {
+      try {
+        await this.inlineRuntime.setReadOnly(readOnly);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[UniverSheetTool] 同步只读状态到工作簿失败：', e);
+      }
+    }
   }
 
   public render(): HTMLElement {
@@ -228,6 +278,16 @@ export default class UniverSheetTool implements BlockTool {
       const runtime = await this.mountUniver(this.inlineContainerEl);
       this.inlineRuntime = runtime;
 
+      // 初始根据 Editor.js 传入的 readOnly 状态设置一次工作簿权限
+      if (typeof this.inlineRuntime.setReadOnly === 'function') {
+        try {
+          await this.inlineRuntime.setReadOnly(this.readOnly);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[UniverSheetTool] 初始化只读状态失败：', e);
+        }
+      }
+
       // 简单策略：每隔 2 秒自动导出一次快照，更新 this.univerData，保证 Editor.js 保存时有最新数据
       if (typeof window !== 'undefined') {
         this.inlineAutoSaveTimer = window.setInterval(async () => {
@@ -250,6 +310,35 @@ export default class UniverSheetTool implements BlockTool {
       console.error('[UniverSheetTool] 挂载嵌入式 univer 失败：', e);
       this.inlineContainerEl.innerHTML =
         '<div class="cdx-univer-sheet__error">无法初始化 Univer 表格，请检查浏览器控制台日志和依赖安装情况。</div>';
+    }
+  }
+
+  /**
+   * Editor.js 在销毁 / 删除块时会调用 destroy，负责清理内部资源。
+   */
+  public destroy(): void {
+    if (this.inlineRuntime) {
+      try {
+        this.inlineRuntime.dispose();
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[UniverSheetTool] 销毁时释放 univer 实例失败：', e);
+      }
+      this.inlineRuntime = null;
+    }
+
+    if (this.inlineAutoSaveTimer != null) {
+      window.clearInterval(this.inlineAutoSaveTimer);
+      this.inlineAutoSaveTimer = null;
+    }
+
+    // 从全局注册表中移除当前实例
+    if (typeof window !== 'undefined') {
+      const w = window as unknown as { __QNotesUniverSheets?: Set<UniverSheetTool> };
+      const set = w.__QNotesUniverSheets;
+      if (set && typeof set.delete === 'function') {
+        set.delete(this);
+      }
     }
   }
 
@@ -370,6 +459,49 @@ export default class UniverSheetTool implements BlockTool {
       // 通过 createUnit 创建或还原一个 Workbook 实例，并直接持有该实例，用其 getSnapshot() 导出数据
       let workbook: any | null = null;
 
+      /**
+       * 根据只读标志更新整个 Workbook 的“可编辑”权限。
+       *
+       * 这里使用了 Univer 文档中推荐的权限服务方式：
+       * https://docs.univer.ai/guides/sheets/features/core/permission
+       */
+      const applyWorkbookEditable = async (editable: boolean) => {
+        if (!workbook) {
+          return;
+        }
+
+        try {
+          // 尽量从 Workbook 实例上获取 unitId，不同版本可能方法名略有差异，逐个兜底。
+          const unitId =
+            (typeof (workbook as any).getUnitId === 'function'
+              ? (workbook as any).getUnitId()
+              : (typeof (workbook as any).getId === 'function'
+                ? (workbook as any).getId()
+                : (workbook as any).unitId ?? (workbook as any).id));
+
+          if (!unitId) {
+            return;
+          }
+
+          const injector = (univer as any).__getInjector?.();
+          const permissionService: IPermissionService | null =
+            injector && typeof injector.get === 'function'
+              ? (injector.get(IPermissionService) as IPermissionService)
+              : null;
+
+          if (!permissionService || typeof (permissionService as any).updatePermissionPoint !== 'function') {
+            return;
+          }
+
+          // WorkbookEditablePermission 对应“整个工作簿是否可编辑”的权限点
+          const editablePoint = new WorkbookEditablePermission(String(unitId));
+          (permissionService as any).updatePermissionPoint(editablePoint.id, editable);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[UniverSheetTool] 更新 Workbook 编辑权限失败：', e);
+        }
+      };
+
       try {
         if (this.univerData) {
           // 如果有历史数据，则作为快照传入，恢复工作簿
@@ -399,8 +531,102 @@ export default class UniverSheetTool implements BlockTool {
         return this.univerData ?? null;
       };
 
+      /**
+       * 监听工作簿真实数据的变更（基于 Univer Facade API）。
+       *
+       * 目标：只在“有可能影响序列化结果”的操作后触发宿主回调，避免选区移动等纯 UI 操作。
+       * 参考官方文档：
+       * https://docs.univer.ai/guides/sheets/features/core/general-api
+       */
+      const dataChangeDisposers: Array<{ dispose: () => void }> = [];
+
+      const handleDataChanged = async () => {
+        try {
+          const snapshot = await exportData();
+          if (snapshot != null) {
+            this.univerData = snapshot;
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[UniverSheetTool] 导出表格快照失败（监听回调）：', e);
+        }
+
+        // 通知宿主：该表格块的“业务数据”已发生变化
+        if (this.config && typeof this.config.onDataChange === 'function') {
+          try {
+            this.config.onDataChange({ snapshot: this.univerData ?? null });
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn('[UnverSheetTool] onDataChange 回调执行失败：', e);
+          }
+        }
+      };
+
+      try {
+        const univerAPI: any =
+          FUniver && typeof (FUniver as any).newAPI === 'function'
+            ? (FUniver as any).newAPI(univer)
+            : null;
+
+        if (univerAPI && univerAPI.Event && typeof univerAPI.addEvent === 'function') {
+          /**
+           * 仅监听与“真实数据变更”直接相关的事件，显式排除滚动、选区移动等纯 UI 事件。
+           * 事件列表参考官方文档：https://docs.univer.ai/guides/sheets/features/core/general-api
+           */
+          const dataEvents: string[] = [
+            'SheetValueChanged',            // 单元格值变更
+            'SheetSkeletonChanged',         // 行列结构变更（插入/删除行列）
+            'SheetAdded',                   // 新增工作表
+            'SheetRemoved',                 // 删除工作表
+            'SheetNameChanged',             // 重命名工作表
+            'SheetDataValidationChanged',   // 数据验证规则变更
+            'SheetDataValidatorStatusChanged',
+            'CommentAdded',
+            'CommentUpdated',
+            'CommentDeleted',
+            'SheetRangeSorted',
+            'SheetRangeFiltered',
+            'BeforePivotTableAdd',
+            'PivotTableAdded',
+          ];
+
+          dataEvents.forEach((key) => {
+            const ev = univerAPI.Event[key];
+            if (!ev) {
+              return;
+            }
+            try {
+              const d = univerAPI.addEvent(ev, () => {
+                void handleDataChanged();
+              });
+              if (d && typeof d.dispose === 'function') {
+                dataChangeDisposers.push(d);
+              }
+            } catch (e) {
+              // 单个事件注册失败不应影响其它事件
+              // eslint-disable-next-line no-console
+              console.warn(`[UniverSheetTool] 注册数据变更事件 ${key} 失败：`, e);
+            }
+          });
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[UniverSheetTool] 注册数据变更监听失败：', e);
+      }
+
       const dispose = () => {
         try {
+          // 先释放基于 Facade API 注册的监听器
+          dataChangeDisposers.forEach((d) => {
+            try {
+              d.dispose();
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.warn('[UniverSheetTool] 释放数据变更监听器失败：', e);
+            }
+          });
+          dataChangeDisposers.length = 0;
+
           if (typeof (univer as any).dispose === 'function') {
             (univer as any).dispose();
           }
@@ -412,6 +638,9 @@ export default class UniverSheetTool implements BlockTool {
 
       // 初始化时立即导出一次快照，确保 this.univerData 不为 null
       try {
+        // 根据当前块的只读状态，先设置一次 Workbook 的编辑权限
+        await applyWorkbookEditable(!this.readOnly);
+
         const initialData = await exportData();
         if (initialData != null) {
           this.univerData = initialData;
@@ -424,6 +653,9 @@ export default class UniverSheetTool implements BlockTool {
       return {
         exportData,
         dispose,
+        setReadOnly: async (readOnly: boolean) => {
+          await applyWorkbookEditable(!readOnly);
+        },
       };
     } catch (err) {
       // eslint-disable-next-line no-console
