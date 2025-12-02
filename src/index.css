@@ -1,0 +1,85 @@
+.cdx-univer-sheet {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #e2e5ec;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cdx-univer-sheet__canvas-wrapper {
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.cdx-univer-sheet__inline-container {
+  margin-top: 8px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  /* 明确给出宽高，方便 univer 正确计算布局并渲染网格 */
+  width: 100%;
+  height: 650px;
+  min-height: 650px;
+  position: relative;
+  /* 让内部的 univer UI 能够充满容器 */
+  display: flex;
+  flex-direction: column;
+}
+
+.cdx-univer-sheet__fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  /* 适度高于普通页面元素，但低于 univer 自己的通知 / 弹层（通常使用 z-index:1000+），
+     这样在全屏模式下，univer 的菜单、工具框等仍能浮在最前面显示。 */
+  z-index: 900;
+  background: #f9fafb;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.cdx-univer-sheet__canvas-wrapper--fullscreen {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.cdx-univer-sheet__canvas-wrapper--fullscreen .cdx-univer-sheet__inline-container {
+  height: 100%;
+  min-height: 100%;
+}
+
+.cdx-univer-sheet__fullscreen-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  /* 使用极大 z-index，确保在 univer 内部复杂 UI 之上可见（参考 Excalidraw 插件做法） */
+  z-index: 2147483647;
+  background: rgba(15, 23, 42, 0.9);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cdx-univer-sheet__fullscreen-toggle:hover {
+  background: rgba(15, 23, 42, 1);
+}
+
+.cdx-univer-sheet__error {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background-color: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+

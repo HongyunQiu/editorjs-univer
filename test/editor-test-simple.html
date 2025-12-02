@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor.js 简化测试 - Univer 表格 Tool</title>
+    <link rel="stylesheet" href="editor-test.css">
+    <!-- 引入Editor.js核心和常用插件（CDN） -->
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/header@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/paragraph@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/checklist@latest/dist/bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/quote@latest/dist/bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/delimiter@latest/dist/bundle.js"></script>
+    <!-- 如 Univer 依赖中存在对 process.env.NODE_ENV 的判断，这里提供最小 polyfill（与主工程保持一致） -->
+    <script>
+      window.process = window.process || { env: { NODE_ENV: 'production' } };
+    </script>
+    <!-- 引入本地构建好的 Univer 表格 Tool（UMD，会挂载为 window.UniverSheet） -->
+    <script src="../dist/univer.umd.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="test-header">
+            <h1>Editor.js 简化测试（含 Univer 表格工具）</h1>
+            <p>在基础工具集上额外测试 UniverSheet BlockTool 的加载与保存</p>
+        </header>
+
+        <div class="test-controls">
+            <button id="init-editor" class="btn btn-primary">初始化编辑器</button>
+            <button id="save-content" class="btn btn-success">保存内容</button>
+            <button id="load-content" class="btn btn-info">加载内容</button>
+            <button id="clear-editor" class="btn btn-warning">清空编辑器</button>
+        </div>
+
+        <div class="editor-section">
+            <div class="editor-container">
+                <div id="editorjs" class="editor"></div>
+            </div>
+
+            <div class="output-section">
+                <h3>输出结果</h3>
+                <div id="output" class="output-content"></div>
+            </div>
+        </div>
+
+        <div class="test-info">
+            <h3>功能测试说明</h3>
+            <ul>
+                <li>支持标题编辑 (Header)</li>
+                <li>支持段落编辑 (Paragraph)</li>
+                <li>支持待办事项列表 (CheckList)</li>
+                <li>支持引用块 (Quote)</li>
+                        <li>支持分隔线 (Delimiter)</li>
+                        <li>支持 Univer 表格块 (UniverSheet)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="editor-test.js"></script>
+</body>
+</html>
+
+
