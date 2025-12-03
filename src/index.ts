@@ -31,6 +31,15 @@ import SheetsUIEnUS from '@univerjs/sheets-ui/locale/en-US';
 import { UniverUIPlugin } from '@univerjs/ui';
 import UIEnUS from '@univerjs/ui/locale/en-US';
 
+// 简体中文语言包（供 QNotes 默认使用中文界面，且未来支持根据外部 locale 切换）
+import DesignZhCN from '@univerjs/design/locale/zh-CN';
+import DocsUIZhCN from '@univerjs/docs-ui/locale/zh-CN';
+import SheetsZhCN from '@univerjs/sheets/locale/zh-CN';
+import SheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
+import SheetsFormulaUIZhCN from '@univerjs/sheets-formula-ui/locale/zh-CN';
+import SheetsNumfmtUIZhCN from '@univerjs/sheets-numfmt-ui/locale/zh-CN';
+import UIZhCN from '@univerjs/ui/locale/zh-CN';
+
 import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';
 import '@univerjs/docs-ui/lib/index.css';
@@ -58,6 +67,26 @@ export interface UniverSheetConfig extends ToolConfig {
    * - 或在其它集成中触发自动保存、同步等逻辑
    */
   onDataChange?: (payload?: { snapshot?: unknown }) => void;
+
+  /**
+   * Univer 内部使用的语言（Locale）。
+   *
+   * - 不传时默认使用英文（LocaleType.EN_US），与当前实现保持兼容
+   * - 未来 QNotes 做整体国际化时，可以在外层根据用户语言传入对应 LocaleType
+   */
+  locale?: LocaleType;
+
+  /**
+   * 允许宿主应用注入自定义 locales 配置（例如自行组合/扩展语言包）。
+   *
+   * - key 通常为 LocaleType（如 LocaleType.EN_US / LocaleType.ZH_CN）或其字符串形式
+   * - value 为对应 locale 合并后的文案对象
+   *
+   * 说明：
+   * - 如果不传，则使用插件内置的默认 locales 配置
+   * - 传入时会与内置 locales 做浅层合并（同 key 会被覆盖）
+   */
+  locales?: Record<string, any>;
 }
 
 export interface UniverSheetData {
@@ -426,13 +455,55 @@ export default class UniverSheetTool implements BlockTool {
         ...(SheetsNumfmtUIEnUS as any),
       };
 
+      const zhLocale = {
+        ...(DesignZhCN as any),
+        ...(UIZhCN as any),
+        ...(DocsUIZhCN as any),
+        ...(SheetsZhCN as any),
+        ...(SheetsUIZhCN as any),
+        ...(SheetsFormulaUIZhCN as any),
+        ...(SheetsNumfmtUIZhCN as any),
+      };
+
+      /**
+       * 解析最终使用的语言：
+       * - 优先使用宿主通过 config.locale 传入的 LocaleType
+       * - 其次尝试从全局 window.QNOTES_EDITOR_LOCALE 推断（'zh-CN' / 'en-US' 等）
+       * - 最后默认使用简体中文（LocaleType.ZH_CN），方便 QNotes 直接使用中文界面
+       */
+      let locale = this.config.locale;
+
+      if (!locale && typeof window !== 'undefined') {
+        const w = window as unknown as { QNOTES_EDITOR_LOCALE?: string };
+        const hinted = w.QNOTES_EDITOR_LOCALE;
+        if (hinted === 'zh-CN') {
+          locale = LocaleType.ZH_CN;
+        } else if (hinted === 'en-US') {
+          locale = LocaleType.EN_US;
+        }
+      }
+
+      if (!locale) {
+        locale = LocaleType.ZH_CN;
+      }
+
+      // 内置一份基础 locales 映射，确保即便宿主不传 locales 也能正常工作
+      const builtinLocales: Record<string, any> = {
+        [LocaleType.EN_US]: enLocale,
+        [LocaleType.ZH_CN]: zhLocale,
+      };
+
+      // 允许宿主应用通过 config.locales 扩展/覆盖内置语言配置
+      const mergedLocales: Record<string, any> = {
+        ...builtinLocales,
+        ...(this.config.locales ?? {}),
+      };
+
       // 按官方文档（插件模式）组合最小 Sheets 应用
       const univer = new Univer({
         theme: defaultTheme,
-        locale: LocaleType.EN_US,
-        locales: {
-          [LocaleType.EN_US]: enLocale,
-        },
+        locale,
+        locales: mergedLocales as any,
       });
 
       // 引擎层
