@@ -91,6 +91,31 @@ const editor = new EditorJS({
 
 ---
 
+## 在 QNotes 中的集成方式（本仓库约定）
+
+QNotes 的运行时插件目录是 `QNotes/public/vendor/`，本插件在 QNotes 中以 **UMD** 方式加载：
+
+- **运行时文件**：`QNotes/public/vendor/editorjs-univer/univer.umd.js`
+- **页面加载位置**：`QNotes/public/index.html`（以 `<script src="vendor/editorjs-univer/univer.umd.js"></script>` 方式加载）
+- **全局变量**：`window.UniverSheet`
+- **工具 key**：`univerSheet`（即 Editor.js 保存数据里的块类型 `type: "univerSheet"`）
+
+### 构建并同步到 QNotes
+
+在 `PlugIns/editorjs-univer` 下执行（Windows）：
+
+- `build_dist_copy.bat`：会先 `vite build`，再把 `dist/univer.umd.js` 复制到 `QNotes/public/vendor/editorjs-univer/univer.umd.js`
+
+### 只读/编辑状态同步（QNotes 侧的契约）
+
+为支持 QNotes 的“只读/编辑”切换，本插件会把实例注册到全局集合：
+
+- `window.__QNotesUniverSheets: Set<UniverSheetTool>`
+
+QNotes 在切换 Editor.js 的只读状态时，会遍历该集合并调用 `tool.applyReadOnly(readOnly)`，将只读状态同步到每个 Univer 表格块内部的 Workbook 权限。
+
+---
+
 ## Block Tool 数据结构
 
 在 Editor.js 的 `save()` 结果中，本工具对应块的数据结构大致为：
