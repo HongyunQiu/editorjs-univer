@@ -59,8 +59,12 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  /* 使用极大 z-index，确保在 univer 内部复杂 UI 之上可见（参考 Excalidraw 插件做法） */
-  z-index: 2147483647;
+  /*
+    默认（非全屏）不要压过 Editor.js 的插入菜单（ce-popover/toolbox），否则会出现遮挡。
+    仅需高于 Univer 内嵌表格容器即可。
+  */
+  /* 但也要高于 Univer 自身的表头/工具栏等 UI，否则按钮会被盖住看不见 */
+  z-index: 4000;
   background: rgba(15, 23, 42, 0.9);
   color: #ffffff;
   border: none;
@@ -68,6 +72,11 @@
   padding: 4px 10px;
   cursor: pointer;
   font-size: 12px;
+}
+
+.cdx-univer-sheet__canvas-wrapper--fullscreen .cdx-univer-sheet__fullscreen-toggle {
+  /* 全屏模式下提升层级，保证“退出全屏”按钮始终可点 */
+  z-index: 2147483647;
 }
 
 .cdx-univer-sheet__fullscreen-toggle:hover {
