@@ -1185,6 +1185,19 @@ export default class UniverSheetTool implements BlockTool {
     }
   }
 
+  private handleWheelWithinContainer = (event: WheelEvent): void => {
+    if (!this.containsEventTarget(event.target)) {
+      return;
+    }
+
+    this.markInteractionActive();
+
+    // Keep wheel scrolling scoped to Univer while the pointer remains inside the sheet area.
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    event.preventDefault();
+  };
+
   /**
    * 切换页面内全屏（参考 editorjs-Excalidraw 的实现思路）：
    * - 非浏览器原生全屏，只是在当前页面内用一个 fixed 覆盖层铺满视口。
@@ -1605,12 +1618,14 @@ export default class UniverSheetTool implements BlockTool {
           container.addEventListener('pointerdown', markInteractionActive, true);
           container.addEventListener('focusin', markInteractionActive, true);
           container.addEventListener('keydown', markInteractionActive, true);
+          container.addEventListener('wheel', this.handleWheelWithinContainer, { capture: true, passive: false });
           document.addEventListener('pointerdown', syncInteractionContext, true);
           document.addEventListener('focusin', syncInteractionContext, true);
           domCleanupCallbacks.push(() => {
             container.removeEventListener('pointerdown', markInteractionActive, true);
             container.removeEventListener('focusin', markInteractionActive, true);
             container.removeEventListener('keydown', markInteractionActive, true);
+            container.removeEventListener('wheel', this.handleWheelWithinContainer, true);
             document.removeEventListener('pointerdown', syncInteractionContext, true);
             document.removeEventListener('focusin', syncInteractionContext, true);
             this.clearInteractionActive();
