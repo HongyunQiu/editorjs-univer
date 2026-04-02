@@ -7,6 +7,7 @@ import {
   CommandType,
   ICommand,
   ICommandService,
+  IConfigService,
   IPermissionService,
   IUniverInstanceService,
   LocaleType,
@@ -39,11 +40,27 @@ import SheetsFormulaUIEnUS from '@univerjs/sheets-formula-ui/locale/en-US';
 import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt';
 import { UniverSheetsNumfmtUIPlugin } from '@univerjs/sheets-numfmt-ui';
 import SheetsNumfmtUIEnUS from '@univerjs/sheets-numfmt-ui/locale/en-US';
+import { UniverSheetsSortPlugin } from '@univerjs/sheets-sort';
+import {
+  SortRangeAscCommand,
+  SortRangeAscInCtxMenuCommand,
+  SortRangeDescCommand,
+  SortRangeDescInCtxMenuCommand,
+  UniverSheetsSortUIPlugin,
+} from '@univerjs/sheets-sort-ui';
+import SheetsSortUIEnUS from '@univerjs/sheets-sort-ui/locale/en-US';
 import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
 import { ISheetClipboardService, type ISheetClipboardHook } from '@univerjs/sheets-ui';
 import SheetsUIEnUS from '@univerjs/sheets-ui/locale/en-US';
 import { SheetDrawingUpdateController } from '@univerjs/sheets-drawing-ui';
-import { UniverUIPlugin } from '@univerjs/ui';
+import {
+  ContextMenuGroup,
+  ContextMenuPosition,
+  IMenuManagerService,
+  MenuItemType,
+  RibbonStartGroup,
+  UniverUIPlugin,
+} from '@univerjs/ui';
 import UIEnUS from '@univerjs/ui/locale/en-US';
 
 // 简体中文语言包（供 QNotes 默认使用中文界面，且未来支持根据外部 locale 切换）
@@ -55,6 +72,7 @@ import SheetsDrawingUIZhCN from '@univerjs/sheets-drawing-ui/locale/zh-CN';
 import SheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
 import SheetsFormulaUIZhCN from '@univerjs/sheets-formula-ui/locale/zh-CN';
 import SheetsNumfmtUIZhCN from '@univerjs/sheets-numfmt-ui/locale/zh-CN';
+import SheetsSortUIZhCN from '@univerjs/sheets-sort-ui/locale/zh-CN';
 import UIZhCN from '@univerjs/ui/locale/zh-CN';
 
 import '@univerjs/design/lib/index.css';
@@ -65,6 +83,8 @@ import '@univerjs/sheets-ui/lib/index.css';
 import '@univerjs/sheets-drawing-ui/lib/index.css';
 import '@univerjs/sheets-formula-ui/lib/index.css';
 import '@univerjs/sheets-numfmt-ui/lib/index.css';
+import '@univerjs/sheets-sort-ui/lib/index.css';
+import { of } from 'rxjs';
 
 export interface UniverSheetConfig extends ToolConfig {
   /**
@@ -750,6 +770,7 @@ export default class UniverSheetTool implements BlockTool {
   private fullscreenToggleButtonEl: HTMLButtonElement | null = null;
   private isFullscreen = false;
   private hasInteractionFocus = false;
+  private sortMenuHideCleanup: (() => void) | null = null;
 
   private config: UniverSheetConfig;
 
@@ -1038,6 +1059,7 @@ export default class UniverSheetTool implements BlockTool {
     inlineContainer.className = 'cdx-univer-sheet__inline-container';
     canvasWrapper.appendChild(inlineContainer);
     this.inlineContainerEl = inlineContainer;
+    this.installSortMenuItemHider();
 
     // 放到下一个事件循环，避免阻塞 Editor.js 其它块的渲染
     if (typeof document !== 'undefined') {
@@ -1047,6 +1069,51 @@ export default class UniverSheetTool implements BlockTool {
     }
 
     return wrapper;
+  }
+
+  private installSortMenuItemHider(): void {
+    if (typeof document === 'undefined' || this.sortMenuHideCleanup) {
+      return;
+    }
+
+    const labelsToHide = new Set<string>([
+      '当前区域升序',
+      '当前区域降序',
+    ]);
+
+    const applyHiddenState = () => {
+      const menuItems = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu-content"] [role="menuitem"]'),
+      );
+
+      menuItems.forEach((item) => {
+        const text = String(item.textContent || '').replace(/\s+/g, '').trim();
+
+        if (!labelsToHide.has(text)) {
+          return;
+        }
+
+        item.style.display = 'none';
+        item.setAttribute('aria-hidden', 'true');
+        item.setAttribute('data-qnotes-hidden-sort-item', 'true');
+      });
+    };
+
+    applyHiddenState();
+
+    const observer = new MutationObserver(() => {
+      applyHiddenState();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    this.sortMenuHideCleanup = () => {
+      observer.disconnect();
+      this.sortMenuHideCleanup = null;
+    };
   }
 
   public save(): UniverSheetData {
@@ -1162,6 +1229,10 @@ export default class UniverSheetTool implements BlockTool {
       if (w.__QNotesActiveUniverSheet === this) {
         w.__QNotesActiveUniverSheet = null;
       }
+    }
+
+    if (this.sortMenuHideCleanup) {
+      this.sortMenuHideCleanup();
     }
   }
 
@@ -1282,6 +1353,7 @@ export default class UniverSheetTool implements BlockTool {
         ...(SheetsUIEnUS as any),
         ...(SheetsFormulaUIEnUS as any),
         ...(SheetsNumfmtUIEnUS as any),
+        ...(SheetsSortUIEnUS as any),
       };
 
       const zhLocale = {
@@ -1294,6 +1366,7 @@ export default class UniverSheetTool implements BlockTool {
         ...(SheetsUIZhCN as any),
         ...(SheetsFormulaUIZhCN as any),
         ...(SheetsNumfmtUIZhCN as any),
+        ...(SheetsSortUIZhCN as any),
       };
 
       /**
@@ -1364,6 +1437,86 @@ export default class UniverSheetTool implements BlockTool {
       univer.registerPlugin(UniverSheetsFormulaUIPlugin);
       univer.registerPlugin(UniverSheetsNumfmtPlugin);
       univer.registerPlugin(UniverSheetsNumfmtUIPlugin);
+      univer.registerPlugin(UniverSheetsSortPlugin);
+      univer.registerPlugin(UniverSheetsSortUIPlugin);
+
+      // 某些内置菜单会在插件初始化阶段合并。这里在所有相关插件注册完成后：
+      // 1. 再次写入 menu 配置作为兜底；
+      // 2. 通过 menuManager.mergeMenu 覆盖菜单节点，触发工具栏菜单重建。
+      try {
+        const injector = (univer as any).__getInjector?.();
+        const configService: IConfigService | null =
+          injector && typeof injector.get === 'function'
+            ? (injector.get(IConfigService) as IConfigService)
+            : null;
+        const menuManager: IMenuManagerService | null =
+          injector && typeof injector.get === 'function'
+            ? (injector.get(IMenuManagerService) as IMenuManagerService)
+            : null;
+
+        if (configService && typeof (configService as any).setConfig === 'function') {
+          (configService as any).setConfig('menu', {
+            [SortRangeAscCommand.id]: {
+              hidden: true,
+            },
+            [SortRangeDescCommand.id]: {
+              hidden: true,
+            },
+            [SortRangeAscInCtxMenuCommand.id]: {
+              hidden: true,
+            },
+            [SortRangeDescInCtxMenuCommand.id]: {
+              hidden: true,
+            },
+          }, { merge: true });
+        }
+
+        if (menuManager && typeof (menuManager as any).mergeMenu === 'function') {
+          (menuManager as any).mergeMenu({
+            [RibbonStartGroup.FORMULAS_INSERT]: {
+              'sheet.menu.sheets-sort': {
+                [SortRangeAscCommand.id]: {
+                  menuItemFactory: () => ({
+                    id: SortRangeAscCommand.id,
+                    type: MenuItemType.BUTTON,
+                    hidden$: of(true),
+                  }),
+                },
+                [SortRangeDescCommand.id]: {
+                  menuItemFactory: () => ({
+                    id: SortRangeDescCommand.id,
+                    type: MenuItemType.BUTTON,
+                    hidden$: of(true),
+                  }),
+                },
+              },
+            },
+            [ContextMenuPosition.MAIN_AREA]: {
+              [ContextMenuGroup.DATA]: {
+                'sheet.menu.sheets-sort-ctx': {
+                  [SortRangeAscInCtxMenuCommand.id]: {
+                    menuItemFactory: () => ({
+                      id: SortRangeAscInCtxMenuCommand.id,
+                      type: MenuItemType.BUTTON,
+                      hidden$: of(true),
+                    }),
+                  },
+                  [SortRangeDescInCtxMenuCommand.id]: {
+                    menuItemFactory: () => ({
+                      id: SortRangeDescInCtxMenuCommand.id,
+                      type: MenuItemType.BUTTON,
+                      hidden$: of(true),
+                    }),
+                  },
+                },
+              },
+            },
+          });
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[UniverSheetTool] 写入排序菜单隐藏配置失败：', e);
+      }
 
       // 通过 createUnit 创建或还原一个 Workbook 实例，并直接持有该实例，用其 getSnapshot() 导出数据
       let workbook: any | null = null;

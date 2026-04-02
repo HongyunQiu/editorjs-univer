@@ -64,6 +64,8 @@
     "@univerjs/sheets-formula-ui": "^0.6.0",
     "@univerjs/sheets-numfmt": "^0.6.0",
     "@univerjs/sheets-numfmt-ui": "^0.6.0",
+    "@univerjs/sheets-sort": "^0.6.10",
+    "@univerjs/sheets-sort-ui": "^0.6.10",
     "@univerjs/sheets-ui": "^0.6.0",
     "@univerjs/ui": "^0.6.0",
     "react": "^18.3.1",
