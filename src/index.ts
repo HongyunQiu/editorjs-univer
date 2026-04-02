@@ -1261,6 +1261,76 @@ export default class UniverSheetTool implements BlockTool {
     }
   }
 
+  private canElementConsumeWheelDelta(element: HTMLElement, event: WheelEvent): boolean {
+    const style = window.getComputedStyle(element);
+    const overflowY = style.overflowY;
+    const overflowX = style.overflowX;
+    const canScrollVertically =
+      (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay')
+      && element.scrollHeight > element.clientHeight;
+    const canScrollHorizontally =
+      (overflowX === 'auto' || overflowX === 'scroll' || overflowX === 'overlay')
+      && element.scrollWidth > element.clientWidth;
+
+    if (canScrollVertically && event.deltaY !== 0) {
+      const nextScrollTop = element.scrollTop + event.deltaY;
+      const maxScrollTop = element.scrollHeight - element.clientHeight;
+
+      if (nextScrollTop > 0 && nextScrollTop < maxScrollTop) {
+        return true;
+      }
+
+      if (event.deltaY < 0 && element.scrollTop > 0) {
+        return true;
+      }
+
+      if (event.deltaY > 0 && element.scrollTop < maxScrollTop) {
+        return true;
+      }
+    }
+
+    if (canScrollHorizontally && event.deltaX !== 0) {
+      const nextScrollLeft = element.scrollLeft + event.deltaX;
+      const maxScrollLeft = element.scrollWidth - element.clientWidth;
+
+      if (nextScrollLeft > 0 && nextScrollLeft < maxScrollLeft) {
+        return true;
+      }
+
+      if (event.deltaX < 0 && element.scrollLeft > 0) {
+        return true;
+      }
+
+      if (event.deltaX > 0 && element.scrollLeft < maxScrollLeft) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private hasScrollableWheelAncestor(target: EventTarget | null | undefined, event: WheelEvent): boolean {
+    if (!(target instanceof Node)) {
+      return false;
+    }
+
+    let current: Node | null = target;
+
+    while (current) {
+      if (current instanceof HTMLElement && this.canElementConsumeWheelDelta(current, event)) {
+        return true;
+      }
+
+      if (current === this.inlineContainerEl || current === this.canvasWrapperEl) {
+        break;
+      }
+
+      current = current.parentNode;
+    }
+
+    return false;
+  }
+
   private handleWheelWithinContainer = (event: WheelEvent): void => {
     if (!this.containsEventTarget(event.target)) {
       return;
@@ -1268,9 +1338,14 @@ export default class UniverSheetTool implements BlockTool {
 
     this.markInteractionActive();
 
+    // Let target-side Univer controls handle wheel first, then only suppress
+    // outer page scrolling when no native scroll container can consume it.
+    if (this.hasScrollableWheelAncestor(event.target, event)) {
+      return;
+    }
+
     // Keep wheel scrolling scoped to Univer while the pointer remains inside the sheet area.
     event.stopPropagation();
-    event.stopImmediatePropagation?.();
     event.preventDefault();
   };
 
@@ -1780,14 +1855,14 @@ export default class UniverSheetTool implements BlockTool {
           container.addEventListener('pointerdown', markInteractionActive, true);
           container.addEventListener('focusin', markInteractionActive, true);
           container.addEventListener('keydown', markInteractionActive, true);
-          container.addEventListener('wheel', this.handleWheelWithinContainer, { capture: true, passive: false });
+          container.addEventListener('wheel', this.handleWheelWithinContainer, { passive: false });
           document.addEventListener('pointerdown', syncInteractionContext, true);
           document.addEventListener('focusin', syncInteractionContext, true);
           domCleanupCallbacks.push(() => {
             container.removeEventListener('pointerdown', markInteractionActive, true);
             container.removeEventListener('focusin', markInteractionActive, true);
             container.removeEventListener('keydown', markInteractionActive, true);
-            container.removeEventListener('wheel', this.handleWheelWithinContainer, true);
+            container.removeEventListener('wheel', this.handleWheelWithinContainer);
             document.removeEventListener('pointerdown', syncInteractionContext, true);
             document.removeEventListener('focusin', syncInteractionContext, true);
             this.clearInteractionActive();

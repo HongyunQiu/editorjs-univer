@@ -97,3 +97,14 @@
 .cdx-univer-sheet__inline-container[data-readonly='true'] {
   background-color: #f3f4f6;
 }
+
+/*
+  Univer menus/popovers are portalled outside the sheet container.
+  When available-height calculation is off inside the embedded Editor.js layout,
+  the panel can become visually clipped without forming a real scroll area.
+  Keep these tool panels bounded to the viewport so wheel scrolling still works.
+*/
+[class*='univer-overflow-y-auto'][class*='univer-max-h-'] {
+  max-height: min(calc(100vh - 24px), var(--radix-popper-available-height, 100vh)) !important;
+  overscroll-behavior: contain;
+}
