@@ -9,6 +9,7 @@
 ## 功能特性
 
 - **内嵌表格编辑**：在 Editor.js 的块中直接渲染 Univer Sheets，小表格随文档一起排版。
+- **筛选 UI**：支持 Univer Sheets 的自动筛选，可直接通过工具栏按钮与列头筛选入口进行条件筛选。
 - **页面内全屏**：块右上角提供“全屏/退出全屏”按钮，切换到铺满视口的表格编辑模式（非浏览器 F11 全屏）。
 - **自动快照保存**：内部定期导出 `Workbook.getSnapshot()`，自动更新 `data.univerData`，确保 `editor.save()` 时拿到的是最新表格数据。
 - **数据可序列化**：表格数据通过 JSON（`univerData`）与上层系统交互，可持久化到任意存储。
@@ -27,6 +28,7 @@ npm install @editorjs/univer-sheet \
   @univerjs/core @univerjs/design @univerjs/docs @univerjs/docs-ui \
   @univerjs/engine-formula @univerjs/engine-render \
   @univerjs/sheets @univerjs/sheets-ui \
+  @univerjs/sheets-filter @univerjs/sheets-filter-ui \
   @univerjs/sheets-formula @univerjs/sheets-formula-ui \
   @univerjs/sheets-numfmt @univerjs/sheets-numfmt-ui \
   react react-dom rxjs

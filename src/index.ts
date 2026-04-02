@@ -37,6 +37,9 @@ import SheetsDrawingUIEnUS from '@univerjs/sheets-drawing-ui/locale/en-US';
 import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula';
 import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui';
 import SheetsFormulaUIEnUS from '@univerjs/sheets-formula-ui/locale/en-US';
+import { UniverSheetsFilterPlugin } from '@univerjs/sheets-filter';
+import { UniverSheetsFilterUIPlugin } from '@univerjs/sheets-filter-ui';
+import SheetsFilterUIEnUS from '@univerjs/sheets-filter-ui/locale/en-US';
 import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt';
 import { UniverSheetsNumfmtUIPlugin } from '@univerjs/sheets-numfmt-ui';
 import SheetsNumfmtUIEnUS from '@univerjs/sheets-numfmt-ui/locale/en-US';
@@ -71,6 +74,7 @@ import SheetsZhCN from '@univerjs/sheets/locale/zh-CN';
 import SheetsDrawingUIZhCN from '@univerjs/sheets-drawing-ui/locale/zh-CN';
 import SheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
 import SheetsFormulaUIZhCN from '@univerjs/sheets-formula-ui/locale/zh-CN';
+import SheetsFilterUIZhCN from '@univerjs/sheets-filter-ui/locale/zh-CN';
 import SheetsNumfmtUIZhCN from '@univerjs/sheets-numfmt-ui/locale/zh-CN';
 import SheetsSortUIZhCN from '@univerjs/sheets-sort-ui/locale/zh-CN';
 import UIZhCN from '@univerjs/ui/locale/zh-CN';
@@ -82,6 +86,7 @@ import '@univerjs/drawing-ui/lib/index.css';
 import '@univerjs/sheets-ui/lib/index.css';
 import '@univerjs/sheets-drawing-ui/lib/index.css';
 import '@univerjs/sheets-formula-ui/lib/index.css';
+import '@univerjs/sheets-filter-ui/lib/index.css';
 import '@univerjs/sheets-numfmt-ui/lib/index.css';
 import '@univerjs/sheets-sort-ui/lib/index.css';
 import { of } from 'rxjs';
@@ -1352,6 +1357,7 @@ export default class UniverSheetTool implements BlockTool {
         ...(SheetsDrawingUIEnUS as any),
         ...(SheetsUIEnUS as any),
         ...(SheetsFormulaUIEnUS as any),
+        ...(SheetsFilterUIEnUS as any),
         ...(SheetsNumfmtUIEnUS as any),
         ...(SheetsSortUIEnUS as any),
       };
@@ -1365,6 +1371,7 @@ export default class UniverSheetTool implements BlockTool {
         ...(SheetsDrawingUIZhCN as any),
         ...(SheetsUIZhCN as any),
         ...(SheetsFormulaUIZhCN as any),
+        ...(SheetsFilterUIZhCN as any),
         ...(SheetsNumfmtUIZhCN as any),
         ...(SheetsSortUIZhCN as any),
       };
@@ -1435,6 +1442,8 @@ export default class UniverSheetTool implements BlockTool {
       univer.registerPlugin(UniverSheetsDrawingUIPlugin);
       univer.registerPlugin(UniverSheetsFormulaPlugin);
       univer.registerPlugin(UniverSheetsFormulaUIPlugin);
+      univer.registerPlugin(UniverSheetsFilterPlugin);
+      univer.registerPlugin(UniverSheetsFilterUIPlugin);
       univer.registerPlugin(UniverSheetsNumfmtPlugin);
       univer.registerPlugin(UniverSheetsNumfmtUIPlugin);
       univer.registerPlugin(UniverSheetsSortPlugin);
