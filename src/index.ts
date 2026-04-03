@@ -35,6 +35,10 @@ import { UniverSheetsPlugin, WorkbookEditablePermission } from '@univerjs/sheets
 import { UniverSheetsFindReplacePlugin } from '@univerjs/sheets-find-replace';
 import '@univerjs/sheets-find-replace/facade';
 import SheetsFindReplaceEnUS from '@univerjs/sheets-find-replace/locale/en-US';
+import { UniverSheetsNotePlugin } from '@univerjs/sheets-note';
+import '@univerjs/sheets-note/facade';
+import { UniverSheetsNoteUIPlugin } from '@univerjs/sheets-note-ui';
+import SheetsNoteUIEnUS from '@univerjs/sheets-note-ui/locale/en-US';
 import SheetsEnUS from '@univerjs/sheets/locale/en-US';
 import { UniverSheetsDrawingPlugin } from '@univerjs/sheets-drawing';
 import { UniverSheetsDrawingUIPlugin } from '@univerjs/sheets-drawing-ui';
@@ -79,6 +83,7 @@ import FindReplaceZhCN from '@univerjs/find-replace/locale/zh-CN';
 import SheetsZhCN from '@univerjs/sheets/locale/zh-CN';
 import SheetsDrawingUIZhCN from '@univerjs/sheets-drawing-ui/locale/zh-CN';
 import SheetsFindReplaceZhCN from '@univerjs/sheets-find-replace/locale/zh-CN';
+import SheetsNoteUIZhCN from '@univerjs/sheets-note-ui/locale/zh-CN';
 import SheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
 import SheetsFormulaUIZhCN from '@univerjs/sheets-formula-ui/locale/zh-CN';
 import SheetsFilterUIZhCN from '@univerjs/sheets-filter-ui/locale/zh-CN';
@@ -95,6 +100,7 @@ import '@univerjs/sheets-ui/lib/index.css';
 import '@univerjs/sheets-drawing-ui/lib/index.css';
 import '@univerjs/sheets-formula-ui/lib/index.css';
 import '@univerjs/sheets-filter-ui/lib/index.css';
+import '@univerjs/sheets-note-ui/lib/index.css';
 import '@univerjs/sheets-numfmt-ui/lib/index.css';
 import '@univerjs/sheets-sort-ui/lib/index.css';
 import { of } from 'rxjs';
@@ -1440,6 +1446,7 @@ export default class UniverSheetTool implements BlockTool {
         ...(SheetsEnUS as any),
         ...(SheetsDrawingUIEnUS as any),
         ...(SheetsFindReplaceEnUS as any),
+        ...(SheetsNoteUIEnUS as any),
         ...(SheetsUIEnUS as any),
         ...(SheetsFormulaUIEnUS as any),
         ...(SheetsFilterUIEnUS as any),
@@ -1456,6 +1463,7 @@ export default class UniverSheetTool implements BlockTool {
         ...(SheetsZhCN as any),
         ...(SheetsDrawingUIZhCN as any),
         ...(SheetsFindReplaceZhCN as any),
+        ...(SheetsNoteUIZhCN as any),
         ...(SheetsUIZhCN as any),
         ...(SheetsFormulaUIZhCN as any),
         ...(SheetsFilterUIZhCN as any),
@@ -1529,6 +1537,8 @@ export default class UniverSheetTool implements BlockTool {
       univer.registerPlugin(UniverSheetsDrawingPlugin);
       univer.registerPlugin(UniverSheetsDrawingUIPlugin);
       univer.registerPlugin(UniverSheetsFindReplacePlugin);
+      univer.registerPlugin(UniverSheetsNotePlugin);
+      univer.registerPlugin(UniverSheetsNoteUIPlugin);
       univer.registerPlugin(UniverSheetsFormulaPlugin);
       univer.registerPlugin(UniverSheetsFormulaUIPlugin);
       univer.registerPlugin(UniverSheetsFilterPlugin);
@@ -1987,11 +1997,11 @@ export default class UniverSheetTool implements BlockTool {
             'SheetAdded',                   // 新增工作表
             'SheetRemoved',                 // 删除工作表
             'SheetNameChanged',             // 重命名工作表
+            'SheetNoteAdd',
+            'SheetNoteDelete',
+            'SheetNoteUpdate',
             'SheetDataValidationChanged',   // 数据验证规则变更
             'SheetDataValidatorStatusChanged',
-            'CommentAdded',
-            'CommentUpdated',
-            'CommentDeleted',
             'SheetRangeSorted',
             'SheetRangeFiltered',
             'BeforePivotTableAdd',
