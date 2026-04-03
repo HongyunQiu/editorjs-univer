@@ -108,3 +108,18 @@
   max-height: min(calc(100vh - 24px), var(--radix-popper-available-height, 100vh)) !important;
   overscroll-behavior: contain;
 }
+
+/*
+  Sheets Note hover popup uses a portalled textarea with `data-u-comp="note-textarea"`.
+  Give it a warm background so it does not visually blend into the sheet canvas.
+*/
+[data-u-comp='note-textarea'] {
+  background: #fff4c2 !important;
+  border: 1px solid #e2b93b !important;
+  box-shadow: 0 8px 24px rgba(130, 98, 8, 0.18) !important;
+  color: #3f3200 !important;
+}
+
+[data-u-comp='note-textarea']::placeholder {
+  color: #8a6d1f !important;
+}

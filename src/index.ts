@@ -9,6 +9,7 @@ import {
   ICommandService,
   IConfigService,
   IPermissionService,
+  IResourceManagerService,
   IUniverInstanceService,
   LocaleType,
   Univer,
@@ -197,6 +198,14 @@ interface UniverRuntime {
    * - readOnly = false -> 允许编辑
    */
   setReadOnly?: (readOnly: boolean) => Promise<void> | void;
+}
+
+interface WorkbookLike {
+  getUnitId?: () => string;
+  getId?: () => string;
+  unitId?: string;
+  id?: string;
+  getSnapshot?: () => Record<string, unknown>;
 }
 
 interface CellImagePasteLocation {
@@ -552,6 +561,21 @@ function parseDimension(value: string | null | undefined): number {
   return match ? Number(match[0]) : 0;
 }
 
+function getWorkbookUnitId(workbook: WorkbookLike | null | undefined): string {
+  if (!workbook) {
+    return '';
+  }
+
+  const unitId =
+    (typeof workbook.getUnitId === 'function'
+      ? workbook.getUnitId()
+      : (typeof workbook.getId === 'function'
+        ? workbook.getId()
+        : (workbook.unitId ?? workbook.id)));
+
+  return String(unitId || '').trim();
+}
+
 function getWrapperForImage(image: HTMLImageElement): HTMLElement | null {
   const wrapper = image?.parentElement;
 
@@ -782,6 +806,7 @@ export default class UniverSheetTool implements BlockTool {
   private facadeAPI: any | null = null;
   private sheetClipboardService: ISheetClipboardService | null = null;
   private workbookRef: any | null = null;
+  private resourceManagerService: IResourceManagerService | null = null;
 
   private canvasWrapperEl: HTMLDivElement | null = null;
   private canvasWrapperParentEl: HTMLElement | null = null;
@@ -1136,6 +1161,12 @@ export default class UniverSheetTool implements BlockTool {
   }
 
   public save(): UniverSheetData {
+    const latestSnapshot = this.captureWorkbookSnapshot();
+
+    if (latestSnapshot != null) {
+      this.univerData = latestSnapshot;
+    }
+
     // Editor.js 的 save 期望是同步返回；这里直接返回当前缓存的 univerData
     // univerData 理论上会通过 mountUniver / 定时导出自动保持最新
     return {
@@ -1152,6 +1183,48 @@ export default class UniverSheetTool implements BlockTool {
   public validate(_data: UniverSheetData): boolean {
     // 极简版本：总是允许保存
     return true;
+  }
+
+  /**
+   * 构造当前 workbook 的完整可持久化快照。
+   *
+   * 说明：
+   * - `workbook.getSnapshot()` 主要包含工作簿主体数据
+   * - 像 sheets-note 这类插件数据通过 `IResourceManagerService` 挂在 `snapshot.resources`
+   * - 若不把 resources 一并写入，重新加载时批注等插件态数据会丢失
+   */
+  private captureWorkbookSnapshot(): unknown | null {
+    const workbook = this.workbookRef as WorkbookLike | null;
+
+    if (!workbook || typeof workbook.getSnapshot !== 'function') {
+      return this.univerData ?? null;
+    }
+
+    try {
+      const snapshot = workbook.getSnapshot();
+      const unitId = getWorkbookUnitId(workbook);
+      const resources =
+        unitId && this.resourceManagerService
+          ? this.resourceManagerService.getResources(unitId, UniverInstanceType.UNIVER_SHEET)
+          : null;
+
+      if (!snapshot || typeof snapshot !== 'object') {
+        return this.univerData ?? null;
+      }
+
+      if (Array.isArray(resources) && resources.length > 0) {
+        return {
+          ...snapshot,
+          resources,
+        };
+      }
+
+      return snapshot;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[UniverSheetTool] 构造完整表格快照失败：', e);
+      return this.univerData ?? null;
+    }
   }
 
   /**
@@ -1642,13 +1715,7 @@ export default class UniverSheetTool implements BlockTool {
         }
 
         try {
-          // 尽量从 Workbook 实例上获取 unitId，不同版本可能方法名略有差异，逐个兜底。
-          const unitId =
-            (typeof (workbook as any).getUnitId === 'function'
-              ? (workbook as any).getUnitId()
-              : (typeof (workbook as any).getId === 'function'
-                ? (workbook as any).getId()
-                : (workbook as any).unitId ?? (workbook as any).id));
+          const unitId = getWorkbookUnitId(workbook as WorkbookLike);
 
           if (!unitId) {
             return;
@@ -1690,17 +1757,7 @@ export default class UniverSheetTool implements BlockTool {
       }
 
       const exportData = async () => {
-        if (!workbook || typeof workbook.getSnapshot !== 'function') {
-          return this.univerData ?? null;
-        }
-        try {
-          // Workbook.getSnapshot() 返回当前的 IWorkbookData 快照
-          return workbook.getSnapshot();
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn('[UniverSheetTool] 导出表格快照失败：', e);
-        }
-        return this.univerData ?? null;
+        return this.captureWorkbookSnapshot();
       };
 
       /**
@@ -1747,7 +1804,9 @@ export default class UniverSheetTool implements BlockTool {
 
         if (injector && typeof injector.get === 'function') {
           const commandService = injector.get(ICommandService) as ICommandService;
+          const resourceManagerService = injector.get(IResourceManagerService) as IResourceManagerService;
           const clipboardService = injector.get(ISheetClipboardService) as ISheetClipboardService;
+          this.resourceManagerService = resourceManagerService ?? null;
           this.sheetClipboardService = clipboardService ?? null;
 
           if (commandService && typeof commandService.registerCommand === 'function') {
@@ -2039,6 +2098,7 @@ export default class UniverSheetTool implements BlockTool {
         try {
           this.facadeAPI = null;
           this.sheetClipboardService = null;
+          this.resourceManagerService = null;
           this.workbookRef = null;
           domCleanupCallbacks.forEach((cleanup) => {
             try {
