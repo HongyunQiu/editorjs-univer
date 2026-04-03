@@ -26,10 +26,15 @@ import DocsUIEnUS from '@univerjs/docs-ui/locale/en-US';
 import { UniverDocsDrawingPlugin } from '@univerjs/docs-drawing';
 import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
 import { getCurrentTypeOfRenderer, IRenderManagerService, UniverRenderEnginePlugin } from '@univerjs/engine-render';
+import { UniverFindReplacePlugin } from '@univerjs/find-replace';
+import FindReplaceEnUS from '@univerjs/find-replace/locale/en-US';
 import { UniverDrawingPlugin } from '@univerjs/drawing';
 import { UniverDrawingUIPlugin } from '@univerjs/drawing-ui';
 import DrawingUIEnUS from '@univerjs/drawing-ui/locale/en-US';
 import { UniverSheetsPlugin, WorkbookEditablePermission } from '@univerjs/sheets';
+import { UniverSheetsFindReplacePlugin } from '@univerjs/sheets-find-replace';
+import '@univerjs/sheets-find-replace/facade';
+import SheetsFindReplaceEnUS from '@univerjs/sheets-find-replace/locale/en-US';
 import SheetsEnUS from '@univerjs/sheets/locale/en-US';
 import { UniverSheetsDrawingPlugin } from '@univerjs/sheets-drawing';
 import { UniverSheetsDrawingUIPlugin } from '@univerjs/sheets-drawing-ui';
@@ -70,8 +75,10 @@ import UIEnUS from '@univerjs/ui/locale/en-US';
 import DesignZhCN from '@univerjs/design/locale/zh-CN';
 import DocsUIZhCN from '@univerjs/docs-ui/locale/zh-CN';
 import DrawingUIZhCN from '@univerjs/drawing-ui/locale/zh-CN';
+import FindReplaceZhCN from '@univerjs/find-replace/locale/zh-CN';
 import SheetsZhCN from '@univerjs/sheets/locale/zh-CN';
 import SheetsDrawingUIZhCN from '@univerjs/sheets-drawing-ui/locale/zh-CN';
+import SheetsFindReplaceZhCN from '@univerjs/sheets-find-replace/locale/zh-CN';
 import SheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
 import SheetsFormulaUIZhCN from '@univerjs/sheets-formula-ui/locale/zh-CN';
 import SheetsFilterUIZhCN from '@univerjs/sheets-filter-ui/locale/zh-CN';
@@ -83,6 +90,7 @@ import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';
 import '@univerjs/docs-ui/lib/index.css';
 import '@univerjs/drawing-ui/lib/index.css';
+import '@univerjs/find-replace/lib/index.css';
 import '@univerjs/sheets-ui/lib/index.css';
 import '@univerjs/sheets-drawing-ui/lib/index.css';
 import '@univerjs/sheets-formula-ui/lib/index.css';
@@ -1428,8 +1436,10 @@ export default class UniverSheetTool implements BlockTool {
         ...(UIEnUS as any),
         ...(DocsUIEnUS as any),
         ...(DrawingUIEnUS as any),
+        ...(FindReplaceEnUS as any),
         ...(SheetsEnUS as any),
         ...(SheetsDrawingUIEnUS as any),
+        ...(SheetsFindReplaceEnUS as any),
         ...(SheetsUIEnUS as any),
         ...(SheetsFormulaUIEnUS as any),
         ...(SheetsFilterUIEnUS as any),
@@ -1442,8 +1452,10 @@ export default class UniverSheetTool implements BlockTool {
         ...(UIZhCN as any),
         ...(DocsUIZhCN as any),
         ...(DrawingUIZhCN as any),
+        ...(FindReplaceZhCN as any),
         ...(SheetsZhCN as any),
         ...(SheetsDrawingUIZhCN as any),
+        ...(SheetsFindReplaceZhCN as any),
         ...(SheetsUIZhCN as any),
         ...(SheetsFormulaUIZhCN as any),
         ...(SheetsFilterUIZhCN as any),
@@ -1509,12 +1521,14 @@ export default class UniverSheetTool implements BlockTool {
       // Drawing / Images 相关
       univer.registerPlugin(UniverDrawingPlugin);
       univer.registerPlugin(UniverDrawingUIPlugin);
+      univer.registerPlugin(UniverFindReplacePlugin);
 
       // Sheets 相关
       univer.registerPlugin(UniverSheetsPlugin);
       univer.registerPlugin(UniverSheetsUIPlugin);
       univer.registerPlugin(UniverSheetsDrawingPlugin);
       univer.registerPlugin(UniverSheetsDrawingUIPlugin);
+      univer.registerPlugin(UniverSheetsFindReplacePlugin);
       univer.registerPlugin(UniverSheetsFormulaPlugin);
       univer.registerPlugin(UniverSheetsFormulaUIPlugin);
       univer.registerPlugin(UniverSheetsFilterPlugin);
