@@ -63,12 +63,13 @@ import {
 } from '@univerjs/sheets-sort-ui';
 import SheetsSortUIEnUS from '@univerjs/sheets-sort-ui/locale/en-US';
 import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
-import { ISheetClipboardService, type ISheetClipboardHook } from '@univerjs/sheets-ui';
+import { ISheetClipboardService, SheetSkeletonManagerService, type ISheetClipboardHook } from '@univerjs/sheets-ui';
 import SheetsUIEnUS from '@univerjs/sheets-ui/locale/en-US';
 import { SheetDrawingUpdateController } from '@univerjs/sheets-drawing-ui';
 import {
   ContextMenuGroup,
   ContextMenuPosition,
+  IContextMenuService,
   IMenuManagerService,
   MenuItemType,
   RibbonStartGroup,
@@ -172,7 +173,20 @@ export interface UniverSheetData {
    * 这里不限定具体结构，完全交给 univer.js 序列化 / 反序列化逻辑处理。
    */
   univerData?: unknown;
+
+  /**
+   * 通用数据源声明，仅作为块级元数据透传保存。
+   */
+  datasource?: {
+    enabled?: boolean;
+    permissionMode?: 'inherit' | 'extended';
+    grants?: {
+      users?: number[];
+    };
+  };
 }
+
+type UniverDatasourceConfig = NonNullable<UniverSheetData['datasource']>;
 
 interface UniverSheetParams {
   data: UniverSheetData;
@@ -801,6 +815,7 @@ export default class UniverSheetTool implements BlockTool {
   private univerData: unknown | null;
 
   private inlineContainerEl: HTMLDivElement | null = null;
+  private wrapperEl: HTMLDivElement | null = null;
   private inlineRuntime: UniverRuntime | null = null;
   private inlineAutoSaveTimer: number | null = null;
   private facadeAPI: any | null = null;
@@ -812,6 +827,7 @@ export default class UniverSheetTool implements BlockTool {
   private canvasWrapperParentEl: HTMLElement | null = null;
   private fullscreenOverlayEl: HTMLDivElement | null = null;
   private fullscreenToggleButtonEl: HTMLButtonElement | null = null;
+  private datasourceStatusBadgeEl: HTMLDivElement | null = null;
   private isFullscreen = false;
   private hasInteractionFocus = false;
   private sortMenuHideCleanup: (() => void) | null = null;
@@ -830,6 +846,7 @@ export default class UniverSheetTool implements BlockTool {
     this.data = {
       title: data?.title ?? '',
       univerData: data?.univerData,
+      datasource: data?.datasource,
     };
 
     this.univerData = this.data.univerData ?? null;
@@ -1068,10 +1085,13 @@ export default class UniverSheetTool implements BlockTool {
         console.warn('[UniverSheetTool] 同步只读状态到工作簿失败：', e);
       }
     }
+
+    this.updateDatasourceUi();
   }
 
   public render(): HTMLElement {
     const wrapper = make('div', [this.css.baseClass, this.css.wrapper]) as HTMLDivElement;
+    this.wrapperEl = wrapper;
 
     // 用一个额外的 canvasWrapper 包一层，方便在“页面内全屏”时把整个区域挂到 body 下
     const canvasWrapper = document.createElement('div');
@@ -1086,6 +1106,11 @@ export default class UniverSheetTool implements BlockTool {
     canvasWrapper.addEventListener('focusin', () => {
       this.markAsActivePasteContext();
     }, true);
+
+    const datasourceStatusBadge = document.createElement('div');
+    datasourceStatusBadge.className = 'cdx-univer-sheet__datasource-badge';
+    canvasWrapper.appendChild(datasourceStatusBadge);
+    this.datasourceStatusBadgeEl = datasourceStatusBadge;
 
     // 右上角全屏按钮（页面内全屏，而非浏览器原生 F11）
     const fullscreenBtn = document.createElement('button');
@@ -1112,7 +1137,53 @@ export default class UniverSheetTool implements BlockTool {
       }, 0);
     }
 
+    this.updateDatasourceUi();
+
     return wrapper;
+  }
+
+  private normalizeDatasourceConfig(
+    value?: UniverSheetData['datasource'] | null,
+  ): UniverDatasourceConfig {
+    const raw = value && typeof value === 'object' ? value : {};
+    const users = Array.isArray(raw.grants?.users)
+      ? raw.grants.users
+        .map((item) => Number(item))
+        .filter((item) => Number.isFinite(item) && item > 0)
+        .map((item) => Math.floor(item))
+      : [];
+
+    return {
+      enabled: !!raw.enabled,
+      permissionMode: raw.permissionMode === 'extended' ? 'extended' : 'inherit',
+      grants: {
+        users,
+      },
+    };
+  }
+
+  private ensureDatasourceConfig(): UniverDatasourceConfig {
+    const normalized = this.normalizeDatasourceConfig(this.data.datasource);
+    this.data.datasource = normalized;
+    return normalized;
+  }
+
+  private isDatasourceEnabled(): boolean {
+    return !!this.normalizeDatasourceConfig(this.data.datasource).enabled;
+  }
+
+  private updateDatasourceUi(): void {
+    const datasource = this.ensureDatasourceConfig();
+    const enabled = !!datasource.enabled;
+
+    if (this.wrapperEl) {
+      this.wrapperEl.classList.toggle('cdx-univer-sheet--datasource-enabled', enabled);
+    }
+
+    if (this.datasourceStatusBadgeEl) {
+      this.datasourceStatusBadgeEl.textContent = enabled ? '已启用数据源' : '';
+      this.datasourceStatusBadgeEl.hidden = !enabled;
+    }
   }
 
   private installSortMenuItemHider(): void {
@@ -1172,6 +1243,7 @@ export default class UniverSheetTool implements BlockTool {
     return {
       title: this.data.title ?? '',
       univerData: this.univerData ?? null,
+      datasource: this.data.datasource,
     };
   }
 
@@ -1802,6 +1874,73 @@ export default class UniverSheetTool implements BlockTool {
 
         const injector = (univer as any).__getInjector?.();
 
+        const handleContainerContextMenu = (event: MouseEvent) => {
+          if (this.readOnly) {
+            return;
+          }
+
+          const target = event.target;
+          if (!this.containsEventTarget(target)) {
+            return;
+          }
+
+          const contextMenuService: IContextMenuService | null =
+            injector && typeof injector.get === 'function'
+              ? (injector.get(IContextMenuService) as IContextMenuService)
+              : null;
+
+          if (!contextMenuService || contextMenuService.disabled) {
+            return;
+          }
+
+          const rect = container.getBoundingClientRect();
+          const offsetX = event.clientX - rect.left;
+          const offsetY = event.clientY - rect.top;
+          const skeletonManager: SheetSkeletonManagerService | null =
+            injector && typeof injector.get === 'function'
+              ? (injector.get(SheetSkeletonManagerService) as SheetSkeletonManagerService)
+              : null;
+          const skeletonParam = skeletonManager?.getCurrentParam?.() ?? null;
+          const skeleton = skeletonParam?.skeleton ?? null;
+          const rowHeaderWidth = Number((skeleton as any)?.rowHeaderWidth ?? 0);
+          const columnHeaderHeight = Number((skeleton as any)?.columnHeaderHeight ?? 0);
+
+          let menuPosition = ContextMenuPosition.MAIN_AREA;
+          if (offsetY <= columnHeaderHeight && offsetX > rowHeaderWidth) {
+            menuPosition = ContextMenuPosition.COL_HEADER;
+          } else if (offsetX <= rowHeaderWidth && offsetY > columnHeaderHeight) {
+            menuPosition = ContextMenuPosition.ROW_HEADER;
+          } else if (offsetX <= rowHeaderWidth && offsetY <= columnHeaderHeight) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation?.();
+          this.markAsActivePasteContext();
+
+          try {
+            contextMenuService.triggerContextMenu({
+              button: event.button,
+              clientX: event.clientX,
+              clientY: event.clientY,
+              offsetX,
+              offsetY,
+              pageX: event.pageX,
+              pageY: event.pageY,
+              ctrlKey: event.ctrlKey,
+              metaKey: event.metaKey,
+              shiftKey: event.shiftKey,
+              altKey: event.altKey,
+              preventDefault: () => {},
+              stopPropagation: () => {},
+            } as any, menuPosition);
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn('[UniverSheetTool] 触发右键菜单失败：', e);
+          }
+        };
+
         if (injector && typeof injector.get === 'function') {
           const commandService = injector.get(ICommandService) as ICommandService;
           const resourceManagerService = injector.get(IResourceManagerService) as IResourceManagerService;
@@ -1938,6 +2077,7 @@ export default class UniverSheetTool implements BlockTool {
           container.addEventListener('pointerdown', markInteractionActive, true);
           container.addEventListener('focusin', markInteractionActive, true);
           container.addEventListener('keydown', markInteractionActive, true);
+          container.addEventListener('contextmenu', handleContainerContextMenu, true);
           container.addEventListener('wheel', this.handleWheelWithinContainer, { passive: false });
           document.addEventListener('pointerdown', syncInteractionContext, true);
           document.addEventListener('focusin', syncInteractionContext, true);
@@ -1945,6 +2085,7 @@ export default class UniverSheetTool implements BlockTool {
             container.removeEventListener('pointerdown', markInteractionActive, true);
             container.removeEventListener('focusin', markInteractionActive, true);
             container.removeEventListener('keydown', markInteractionActive, true);
+            container.removeEventListener('contextmenu', handleContainerContextMenu, true);
             container.removeEventListener('wheel', this.handleWheelWithinContainer);
             document.removeEventListener('pointerdown', syncInteractionContext, true);
             document.removeEventListener('focusin', syncInteractionContext, true);

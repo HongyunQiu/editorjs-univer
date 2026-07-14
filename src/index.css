@@ -9,6 +9,14 @@
   gap: 8px;
 }
 
+.cdx-univer-sheet--datasource-enabled {
+  border-color: #17803d;
+  background:
+    linear-gradient(180deg, rgba(225, 248, 232, 0.9) 0%, rgba(249, 250, 251, 1) 18%),
+    #f9fafb;
+  box-shadow: inset 0 0 0 1px rgba(23, 128, 61, 0.12);
+}
+
 .cdx-univer-sheet__canvas-wrapper {
   border-radius: 6px;
   overflow: hidden;
@@ -76,8 +84,31 @@
   font-size: 12px;
 }
 
+.cdx-univer-sheet__datasource-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  max-width: calc(100% - 92px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  left: 8px;
+  z-index: 4000;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: rgba(225, 248, 232, 0.96);
+  color: #166534;
+  border: 1px solid rgba(22, 101, 52, 0.18);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .cdx-univer-sheet__canvas-wrapper--fullscreen .cdx-univer-sheet__fullscreen-toggle {
   /* 全屏模式下提升层级，保证“退出全屏”按钮始终可点 */
+  z-index: 2147483647;
+}
+
+.cdx-univer-sheet__canvas-wrapper--fullscreen .cdx-univer-sheet__datasource-badge {
   z-index: 2147483647;
 }
 
@@ -122,4 +153,10 @@
 
 [data-u-comp='note-textarea']::placeholder {
   color: #8a6d1f !important;
+}
+
+@media (max-width: 640px) {
+  .cdx-univer-sheet__datasource-badge {
+    max-width: calc(100% - 16px);
+  }
 }
